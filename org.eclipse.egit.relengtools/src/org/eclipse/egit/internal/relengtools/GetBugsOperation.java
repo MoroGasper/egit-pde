@@ -17,7 +17,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -31,7 +30,12 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.egit.core.GitTag;
+import org.eclipse.egit.core.project.RepositoryMapping;
 import org.eclipse.jface.operation.IRunnableWithProgress;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.LogCommand;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.ui.statushandlers.StatusManager;
 
 public class GetBugsOperation {
@@ -74,13 +78,26 @@ public class GetBugsOperation {
 					monitor.beginTask(
 							Messages.getString("GetBugsOperation.0"), totalWork); //$NON-NLS-1$
 
-					// task 1 -- get bug number from comments
-					final Set bugTree = new HashSet();
+					final IProject[] selectedProjects = wizard
+							.getSelectedProjects();
+
+					// task 1 -- get bug numbers from comments
+					Set<Integer> bugTree;
+					try {
+						bugTree = getBugNumbersFromComments(
+								selectedProjects,
+								new SubProgressMonitor(
+										monitor,
+										85,
+										SubProgressMonitor.SUPPRESS_SUBTASK_LABEL));
+					} catch (final Exception e) {
+						monitor.done();
+						return;
+					}
 
 					// task 2 -- create map of bugs and summaries
-					final Integer[] bugs = (Integer[]) bugTree
-							.toArray(new Integer[0]);
-					final TreeMap map = (TreeMap) getBugzillaSummaries(bugs,
+					final Integer[] bugs = bugTree.toArray(new Integer[0]);
+					final Map<Integer, String> map = getBugzillaSummaries(bugs,
 							new SubProgressMonitor(monitor, 15,
 									SubProgressMonitor.SUPPRESS_SUBTASK_LABEL));
 					page.getShell().getDisplay().asyncExec(new Runnable() {
@@ -99,29 +116,45 @@ public class GetBugsOperation {
 		}
 	}
 
-	protected Set getBugNumbersFromComments(Object[] syncInfos,
-			IProgressMonitor monitor) {
-		monitor.beginTask("Scanning comments for bug numbers", syncInfos.length);
-		final TreeSet set = new TreeSet();
-		for (int i = 0; i < syncInfos.length; i++) {
-			final Object info = syncInfos[i];
-			getBugNumbersForSyncInfo(info, monitor, set);
+	protected Set<Integer> getBugNumbersFromComments(IProject[] projects,
+			IProgressMonitor monitor) throws Exception {
+		monitor.beginTask("Scanning comments for bug numbers", projects.length);
+		final Set<Integer> set = new TreeSet<Integer>();
+		for (int i = 0; i < projects.length; i++) {
+			getBugNumbersForProject(projects[i], monitor, set);
 			monitor.worked(1);
 		}
 		monitor.done();
 		return set;
 	}
 
-	private void getBugNumbersForSyncInfo(Object info,
-			IProgressMonitor monitor, Set set) {
+	private void getBugNumbersForProject(IProject project,
+			IProgressMonitor monitor, Set<Integer> set) throws Exception {
 
+		final RepositoryMapping rm = RepositoryMapping.getMapping(project);
+		final Repository repository = rm.getRepository();
+
+		final RevCommit previousCommit = ShowInfoHandler.getCommitForTag(
+				repository, getProjectTag(project).getName());
+		final RevCommit latestCommit = ShowInfoHandler.getLatestCommitFor(rm,
+				repository, project);
+
+		final Git git = new Git(repository);
+		final LogCommand log = git.log();
+		log.addRange(previousCommit, latestCommit);
+		for (final RevCommit commit : log.call()) {
+			findBugNumber(commit.getFullMessage(), set);
+		}
 	}
 
 	private GitTag getProjectTag(IProject project) {
+		final MapEntry mapEntry = wizard.getMapProject().getMapEntry(project);
+		if (mapEntry != null)
+			return mapEntry.getTag();
 		return MapEntry.DEFAULT;
 	}
 
-	protected void findBugNumber(String comment, Set set) {
+	protected void findBugNumber(String comment, Set<Integer> set) {
 		if (comment == null) {
 			return;
 		}
@@ -136,14 +169,15 @@ public class GetBugsOperation {
 	 * Method uses set of bug numbers to query bugzilla and get summary of each
 	 * bug
 	 */
-	protected Map getBugzillaSummaries(Integer[] bugs, IProgressMonitor monitor) {
+	protected Map<Integer, String> getBugzillaSummaries(Integer[] bugs,
+			IProgressMonitor monitor) {
 		monitor.beginTask(
 				Messages.getString("GetBugsOperation.1"), bugs.length + 1); //$NON-NLS-1$
 		HttpURLConnection hURL;
 		DataInputStream in;
 		URLConnection url;
 		StringBuffer buffer;
-		final TreeMap map = new TreeMap();
+		final TreeMap<Integer, String> map = new TreeMap<Integer, String>();
 		for (int i = 0; i < bugs.length; i++) {
 			try {
 				url = (new URL(BUG_DATABASE_PREFIX + bugs[i]

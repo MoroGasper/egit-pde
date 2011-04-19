@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2010 IBM Corporation and others.
+ * Copyright (c) 2000, 2011 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -42,8 +42,6 @@ public class MapEntry {
 	private String id = EMPTY_STRING;
 
 	private OrderedMap arguments = new OrderedMap();
-
-	private boolean legacy = false;
 
 	private String version;
 
@@ -136,6 +134,8 @@ public class MapEntry {
 		final String[] args = getArrayFromStringWithBlank(
 				entryLine.substring(end + 1), ",");
 		this.arguments = populate(args);
+		if (this.arguments == null)
+			return;
 		final String tag = (String) arguments.get(KEY_TAG);
 		final String repo = (String) arguments.get(REPO);
 		if (tag == null || tag.length() == 0 || repo == null
@@ -145,42 +145,26 @@ public class MapEntry {
 	}
 
 	/*
-	 * Build a table from the given array. In the new format,the array contains
-	 * key=value elements. Otherwise we fill in the key based on the old format.
+	 * Build a table from the given array. We only understand GIT map entries of
+	 * the format "GIT,key=value[,key=value]*
 	 */
 	private OrderedMap populate(String[] entries) {
+		if (entries.length <= 1 || !"GIT".equalsIgnoreCase(entries[0])) {
+			// not a GIT entry, ignore
+			return null;
+		}
+
 		final OrderedMap result = new OrderedMap();
-		for (int i = 0; i < entries.length; i++) {
+		for (int i = 1; i < entries.length; i++) {
 			final String entry = entries[i];
 			final int index = entry.indexOf('=');
 			if (index == -1) {
-				// we only handle CVS entries
-				if (i == 0 && "GIT".equalsIgnoreCase(entry))
-					continue;
-				// legacy story...
-				return legacyPopulate(entries);
+				// bad entry
+				return null;
 			}
 			final String key = entry.substring(0, index);
 			final String value = entry.substring(index + 1);
 			result.put(key, value);
-		}
-		result.toString();
-		return result;
-	}
-
-	private OrderedMap legacyPopulate(String[] entries) {
-		legacy = true;
-		final OrderedMap result = new OrderedMap();
-		// must have at least tag and connect string
-		if (entries.length >= 2) {
-			// Version
-			result.put(KEY_TAG, entries[0]);
-			// Repo Connect String
-			result.put(REPO, entries[1]);
-
-			// Optional CVS Module Name
-			if (entries.length >= 3)
-				result.put(KEY_PATH, entries[3]);
 		}
 		return result;
 	}
@@ -263,22 +247,6 @@ public class MapEntry {
 
 	public String getMapString() {
 		final StringBuffer result = new StringBuffer();
-		if (legacy) {
-			result.append(getType());
-			result.append('@');
-			result.append(getId());
-			if (version != null) {
-				result.append(',');
-				result.append(version);
-			}
-			result.append('=');
-			result.append(getTagName());
-			result.append(',');
-			result.append(getRepo());
-			result.append(',');
-			result.append(getPath());
-			return result.toString();
-		}
 		result.append(getType());
 		result.append('@');
 		result.append(getId());

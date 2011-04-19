@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2010 IBM Corporation and others.
+ * Copyright (c) 2000, 2011 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -19,16 +19,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IStatus;
-import org.eclipse.core.runtime.Status;
-
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IResourceProxy;
 import org.eclipse.core.resources.IResourceProxyVisitor;
 import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
 
 public class MapFile {
 
@@ -54,7 +53,7 @@ public class MapFile {
 
 	protected void loadEntries() throws CoreException {
 		InputStream inputStream = null;
-		List list = new ArrayList();
+		final List<MapEntry> list = new ArrayList<MapEntry>();
 
 		try {
 			inputStream = file.getContents();
@@ -63,7 +62,9 @@ public class MapFile {
 			String aLine = aReader.readLine();
 			while (aLine != null) {
 				if (isMapLine(aLine)) {
-					list.add(new MapEntry(aLine));
+					final MapEntry entry = new MapEntry(aLine);
+					if (entry.isValid())
+						list.add(new MapEntry(aLine));
 				}
 				aLine = aReader.readLine();
 			}
@@ -82,7 +83,7 @@ public class MapFile {
 			}
 		}
 
-		this.entries = (MapEntry[]) list.toArray(new MapEntry[list.size()]);
+		this.entries = list.toArray(new MapEntry[list.size()]);
 	}
 
 	private boolean isMapLine(String line) {
@@ -100,6 +101,10 @@ public class MapFile {
 			}
 		}
 		return false;
+	}
+
+	public int size() {
+		return entries != null ? entries.length : 0;
 	}
 
 	public MapEntry getMapEntry(IProject project) {
@@ -163,9 +168,14 @@ public class MapFile {
 
 				if (type == IResource.FILE
 						&& resourceProxy.getName().endsWith(
-								MAP_FILE_NAME_ENDING))
-					mapFiles.add(new MapFile((IFile) resourceProxy
-							.requestResource()));
+								MAP_FILE_NAME_ENDING)) {
+					final MapFile map = new MapFile(
+							(IFile) resourceProxy.requestResource());
+
+					// don't both with map files that didn't contain GIT entries
+					if (map.size() > 0)
+						mapFiles.add(map);
+				}
 
 				return true;
 			}
