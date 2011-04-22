@@ -17,6 +17,9 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.SubProgressMonitor;
+import org.eclipse.egit.core.op.TagOperation;
+import org.eclipse.egit.core.project.RepositoryMapping;
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.dialogs.DialogSettings;
 import org.eclipse.jface.dialogs.IDialogSettings;
@@ -25,6 +28,12 @@ import org.eclipse.jface.window.Window;
 import org.eclipse.jface.wizard.IWizardPage;
 import org.eclipse.jface.wizard.Wizard;
 import org.eclipse.jface.wizard.WizardDialog;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.TagBuilder;
+import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.swt.widgets.Shell;
 
 public class ReleaseWizard extends Wizard {
@@ -47,6 +56,8 @@ public class ReleaseWizard extends Wizard {
 
 	private BuildNotesPage buildNotesPage;
 
+	private MapFileComparePage mapComparePage;
+
 	@Override
 	public boolean performFinish() {
 		if (!isProjectSelected())
@@ -56,6 +67,18 @@ public class ReleaseWizard extends Wizard {
 				@Override
 				public void run(IProgressMonitor monitor)
 						throws InvocationTargetException, InterruptedException {
+
+					monitor.beginTask("Processing",
+							2 * (1 + selectedProjects.length));
+					monitor.worked(1);
+					for (final IProject project : selectedProjects) {
+						try {
+							tagProject(project, monitor);
+							monitor.worked(1);
+						} catch (final Exception e) {
+							throw new InvocationTargetException(e);
+						}
+					}
 					monitor.beginTask("Processing", 1 + selectedProjects.length);
 					monitor.worked(1);
 					final String tag = tagPage.getTagString();
@@ -81,6 +104,33 @@ public class ReleaseWizard extends Wizard {
 			e.printStackTrace();
 		}
 		return false;
+	}
+
+	private void tagProject(IProject project, IProgressMonitor monitor)
+			throws Exception {
+		monitor = new SubProgressMonitor(monitor, 1);
+		monitor.beginTask("Tagging " + project.getName(), 1);
+
+		final boolean shouldMoveTag = tagPage.isMoveButtonSelected();
+		final RepositoryMapping rm = RepositoryMapping.getMapping(project);
+		final Repository repository = rm.getRepository();
+
+		final RevWalk rw = new RevWalk(repository);
+		final RevObject target = rw
+				.parseAny(repository.resolve(Constants.HEAD));
+
+		final PersonIdent personIdent = new PersonIdent(repository);
+		final String tagName = tagPage.getTagString();
+		final TagBuilder tag = new TagBuilder();
+		tag.setTag(tagName);
+		tag.setTagger(personIdent);
+		tag.setObjectId(target);
+
+		final TagOperation operation = new TagOperation(repository, tag,
+				shouldMoveTag);
+
+		operation.execute(monitor);
+		monitor.done();
 	}
 
 	private boolean isProjectSelected() {
@@ -135,6 +185,12 @@ public class ReleaseWizard extends Wizard {
 				section, null);
 		buildNotesPage.setDescription(Messages.getString("ReleaseWizard.0")); //$NON-NLS-1$
 		addPage(buildNotesPage);
+
+		mapComparePage = new MapFileComparePage("MapComparePage", //$NON-NLS-1$
+				Messages.getString("ReleaseWizard.15"), //$NON-NLS-1$
+				null);
+		mapComparePage.setDescription(Messages.getString("ReleaseWizard.16")); //$NON-NLS-1$
+		addPage(mapComparePage);
 	}
 
 	@Override
@@ -161,14 +217,15 @@ public class ReleaseWizard extends Wizard {
 		if (page == buildNotesPage) {
 			return tagPage;
 		}
-		// if (page == tagPage) {
-		// if (tagPage.compareButtonSelected()){
-		// mapComparePage.setTag(tagPage.getTagString());
-		// return mapComparePage;
-		// }
-		// if (tagPage.commitButtonSelected())
-		// return commentPage;
-		// }
+
+		if (page == tagPage) {
+			if (tagPage.compareButtonSelected()) {
+				mapComparePage.setTag(tagPage.getTagString());
+				return mapComparePage;
+			}
+			// if (tagPage.commitButtonSelected())
+			// return commentPage;
+		}
 		return null;
 	}
 
@@ -180,7 +237,7 @@ public class ReleaseWizard extends Wizard {
 		mapProject = m;
 		projectSelectionPage.updateMapProject(m);
 		// projectComparePage.updateMapProject(m);
-		// mapComparePage.updateMapProject(m);
+		mapComparePage.updateMapProject(m);
 	}
 
 	public IProject[] getPreSelectedProjects() {
