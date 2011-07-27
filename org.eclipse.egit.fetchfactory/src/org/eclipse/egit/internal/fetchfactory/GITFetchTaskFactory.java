@@ -495,6 +495,10 @@ public class GITFetchTaskFactory implements IFetchFactory {
 					locationToCheckIfPluginLocal.toString());
 		script.printAntCallTask(TARGET_CLONE_REPO, true, params);
 
+		// re-determine availability of local repo (done to avoid unnecessary
+		// Git operations)
+		printAvailableTask(localGitRepo, localGitRepo, script);
+
 		// checkout the tag
 		params.clear();
 		params.put(PROP_GITREPO_LOCAL_PATH, localGitRepo);
@@ -503,10 +507,6 @@ public class GITFetchTaskFactory implements IFetchFactory {
 			params.put(PROP_FILETOCHECK,
 					locationToCheckIfPluginLocal.toString());
 		script.printAntCallTask(TARGET_CHECKOUT_TAG, true, params);
-
-		// re-determine availability of local repo (done to avoid unnecessary
-		// Git operations)
-		printAvailableTask(localGitRepo, localGitRepo, script);
 	}
 
 	private void printConditionEnd(IAntScript script) {
