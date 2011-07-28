@@ -436,8 +436,18 @@ public class GITFetchTaskFactory implements IFetchFactory {
 
 		// add entries to the entryInfo map here instead of inside the loop
 		// to avoid contaminating entryInfos
-		final String overrideTag = overrideTags != null ? overrideTags
-				.getProperty(OVERRIDE_TAG) : null;
+		String overrideTag = null;
+		if (overrideTags != null) {
+			// Check for overrides first for the project, then for the repo, and
+			// finally for Git in general.
+			overrideTag = overrideTags.getProperty((String) entryInfos
+					.get(KEY_ELEMENT_NAME));
+			if (overrideTag == null)
+				overrideTag = overrideTags.getProperty(table.get(KEY_REPO));
+			if (overrideTag == null)
+				overrideTag = overrideTags.getProperty(OVERRIDE_TAG);
+		}
+
 		entryInfos
 				.put(IFetchFactory.KEY_ELEMENT_TAG, (overrideTag != null
 						&& overrideTag.trim().length() != 0 ? overrideTag
