@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2010 IBM Corporation and others.
+ * Copyright (c) 2000, 2011 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -27,7 +27,7 @@ import org.eclipse.swt.graphics.Image;
 
 public class MapContentDocument implements ITypedElement,
 		IStreamContentAccessor {
-	private MapFile mapFile;
+	private final MapFile mapFile;
 
 	private String oldContents = ""; //$NON-NLS-1$
 
@@ -42,24 +42,20 @@ public class MapContentDocument implements ITypedElement,
 	 * Update the tag associated with the given project in the new contents.
 	 */
 	public void updateTag(IProject project, String tag) throws CoreException {
-		InputStream inputStream = new BufferedInputStream(
+		final InputStream inputStream = new BufferedInputStream(
 				new ByteArrayInputStream(newContents.getBytes()));
 		boolean match = false;
-		StringBuffer buffer = new StringBuffer();
+		final StringBuffer buffer = new StringBuffer();
 		try {
-			BufferedReader aReader = new BufferedReader(new InputStreamReader(
-					inputStream));
+			final BufferedReader aReader = new BufferedReader(
+					new InputStreamReader(inputStream));
 			String aLine = aReader.readLine();
 			while (aLine != null) {
 				if (aLine.trim().length() != 0 && !aLine.startsWith("!")
 						&& !aLine.startsWith("#")) {
 					// Found a possible match
-					MapEntry entry = new MapEntry(aLine);
-					if (!entry.isValid()) {
-						throw new CoreException(new Status(IStatus.ERROR, "",
-								"Malformed map file line: " + aLine));
-					}
-					if (entry.isMappedTo(project)) {
+					final MapEntry entry = new MapEntry(aLine);
+					if (entry.isValid() && entry.isMappedTo(project)) {
 						// Now for sure we have a match. Replace the line.
 						entry.setTagName(tag);
 						aLine = entry.getMapString();
@@ -72,14 +68,14 @@ public class MapContentDocument implements ITypedElement,
 					buffer.append(System.getProperty("line.separator")); //$NON-NLS-1$
 				}
 			}
-		} catch (IOException e) {
+		} catch (final IOException e) {
 			throw new CoreException(new Status(IStatus.ERROR, "",
 					e.getMessage(), e));
 		} finally {
 			if (inputStream != null) {
 				try {
 					inputStream.close();
-				} catch (IOException e) {
+				} catch (final IOException e) {
 					e.printStackTrace();
 				}
 			}
@@ -95,36 +91,40 @@ public class MapContentDocument implements ITypedElement,
 
 	/*
 	 * (non-Javadoc)
-	 *
+	 * 
 	 * @see org.eclipse.compare.ITypedElement#getName()
 	 */
+	@Override
 	public String getName() {
 		return mapFile.getFile().getName();
 	}
 
 	/*
 	 * (non-Javadoc)
-	 *
+	 * 
 	 * @see org.eclipse.compare.ITypedElement#getImage()
 	 */
+	@Override
 	public Image getImage() {
 		return null;
 	}
 
 	/*
 	 * (non-Javadoc)
-	 *
+	 * 
 	 * @see org.eclipse.compare.ITypedElement#getType()
 	 */
+	@Override
 	public String getType() {
 		return mapFile.getFile().getFileExtension();
 	}
 
 	/*
 	 * (non-Javadoc)
-	 *
+	 * 
 	 * @see org.eclipse.compare.IStreamContentAccessor#getContents()
 	 */
+	@Override
 	public InputStream getContents() throws CoreException {
 		return new ByteArrayInputStream(getNewContent().getBytes());
 	}
@@ -139,11 +139,11 @@ public class MapContentDocument implements ITypedElement,
 
 	private void initialize() {
 		InputStream inputStream;
-		StringBuffer buffer = new StringBuffer();
+		final StringBuffer buffer = new StringBuffer();
 		try {
 			inputStream = mapFile.getFile().getContents();
-			BufferedReader aReader = new BufferedReader(new InputStreamReader(
-					inputStream));
+			final BufferedReader aReader = new BufferedReader(
+					new InputStreamReader(inputStream));
 			String aLine = aReader.readLine();
 			while (aLine != null) {
 				buffer.append(aLine);
@@ -154,9 +154,9 @@ public class MapContentDocument implements ITypedElement,
 			}
 			oldContents = buffer.toString();
 			newContents = new String(oldContents);
-		} catch (CoreException e) {
+		} catch (final CoreException e) {
 			e.printStackTrace();
-		} catch (IOException e) {
+		} catch (final IOException e) {
 			e.printStackTrace();
 		}
 	}
