@@ -15,7 +15,7 @@
    <extension
          point="org.eclipse.core.runtime.adapters">
       <factory
-            adaptableType="org.eclipse.team.core.RepositoryProviderType"
+            adaptableType="org.eclipse.egit.core.internal.GitRepositoryProviderType"
             class="org.eclipse.egit.internal.relengtools.GitCopyrightAdapterFactory">
          <adapter
                type="org.eclipse.releng.tools.IRepositoryProviderCopyrightAdapterFactory">

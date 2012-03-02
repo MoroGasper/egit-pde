@@ -27,12 +27,12 @@ public class GitCopyrightAdapterFactory implements IAdapterFactory,
 	public Object getAdapter(Object adaptableObject, Class adapterType) {
 		if (IRepositoryProviderCopyrightAdapterFactory.class
 				.equals(adapterType)) {
-			return getCvsCopyrightAdapter(adaptableObject);
+			return getGitCopyrightAdapter(adaptableObject);
 		}
 		return null;
 	}
 
-	private Object getCvsCopyrightAdapter(Object adaptableObject) {
+	private Object getGitCopyrightAdapter(Object adaptableObject) {
 		if (!(adaptableObject instanceof RepositoryProviderType))
 			return null;
 		return this;
@@ -48,5 +48,4 @@ public class GitCopyrightAdapterFactory implements IAdapterFactory,
 			IResource[] resources) {
 		return new GitCopyrightAdapter(resources);
 	}
-
 }

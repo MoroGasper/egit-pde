@@ -19,6 +19,8 @@ import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
 import org.eclipse.egit.core.project.RepositoryMapping;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -26,6 +28,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
+import org.eclipse.osgi.util.NLS;
 import org.eclipse.releng.tools.RepositoryProviderCopyrightAdapter;
 
 public class GitCopyrightAdapter extends RepositoryProviderCopyrightAdapter {
@@ -36,22 +39,24 @@ public class GitCopyrightAdapter extends RepositoryProviderCopyrightAdapter {
 		super(resources);
 	}
 
+	@Override
 	public int getLastModifiedYear(IFile file, IProgressMonitor monitor)
 			throws CoreException {
 		try {
 			monitor.beginTask("Fetching logs from Git", 100); //$NON-NLS-1$
-			RepositoryMapping mapping = RepositoryMapping.getMapping(file);
+			final RepositoryMapping mapping = RepositoryMapping
+					.getMapping(file);
 			if (mapping != null) {
-				Repository repo = mapping.getRepository();
+				final Repository repo = mapping.getRepository();
 				if (repo != null) {
 					RevWalk walk = null;
 					try {
-						ObjectId start = repo.resolve(Constants.HEAD);
+						final ObjectId start = repo.resolve(Constants.HEAD);
 						walk = new RevWalk(repo);
 						walk.setTreeFilter(PathFilter.create(mapping
 								.getRepoRelativePath(file)));
 						walk.markStart(walk.lookupCommit(start));
-						RevCommit commit = walk.next();
+						final RevCommit commit = walk.next();
 						if (commit != null) {
 							if (filterString != null
 									&& commit.getFullMessage().toLowerCase()
@@ -60,13 +65,17 @@ public class GitCopyrightAdapter extends RepositoryProviderCopyrightAdapter {
 								// ignore
 								return 0;
 							}
-							Calendar calendar = Calendar.getInstance();
-							calendar.setTimeInMillis(commit.getCommitTime() * 1000);
+							final Calendar calendar = Calendar.getInstance();
+							calendar.setTimeInMillis(0);
+							calendar.add(Calendar.SECOND,
+									commit.getCommitTime());
 							return calendar.get(Calendar.YEAR);
 						}
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+					} catch (final IOException e) {
+						throw new CoreException(new Status(IStatus.ERROR,
+								"org.eclipse.egit.relengtools", 0, NLS.bind(
+										"An error occured when processing {0}",
+										file.getName()), e));
 					} finally {
 						if (walk != null)
 							walk.release();
@@ -80,6 +89,7 @@ public class GitCopyrightAdapter extends RepositoryProviderCopyrightAdapter {
 		return -1;
 	}
 
+	@Override
 	public void initialize(IProgressMonitor monitor) throws CoreException {
 		// TODO We should perform a bulk "log" command to get the last modified
 		// year
